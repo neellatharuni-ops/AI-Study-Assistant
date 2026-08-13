@@ -1,0 +1,54 @@
+DSA NOTES
+
+Data Structures:
+
+A data structure is a way of organizing and storing data so that it can be accessed and modified efficiently.
+
+Arrays:
+
+An array stores elements of the same type in contiguous memory locations.
+
+Advantages:
+- Fast access using index.
+- Simple to use.
+
+Linked List:
+
+A linked list consists of nodes. Each node contains data and a pointer to the next node.
+
+Stack:
+
+A stack follows LIFO: Last In, First Out.
+
+Main operations:
+- Push
+- Pop
+- Peek
+
+Queue:
+
+A queue follows FIFO: First In, First Out.
+
+Main operations:
+- Enqueue
+- Dequeue
+
+Trees:
+
+A tree is a hierarchical data structure.
+
+Binary Tree:
+
+A binary tree is a tree in which each node has at most two children.
+
+Binary Search Tree:
+
+In a BST:
+- Left subtree contains smaller values.
+- Right subtree contains larger values.
+
+B-Tree:
+
+A B-Tree is a self-balancing multiway search tree commonly used in databases and file systems.
+
+B-Trees keep data sorted and allow efficient searching, insertion and deletion.

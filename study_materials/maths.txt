@@ -1,0 +1,41 @@
+MATHS NOTES
+
+Matrices:
+
+A matrix is a rectangular arrangement of numbers in rows and columns.
+
+Determinant:
+
+The determinant is a scalar value calculated from a square matrix.
+
+Differentiation:
+
+Differentiation is used to find the rate of change of a function.
+
+Integration:
+
+Integration is used to find accumulated quantities and areas under curves.
+
+Limits:
+
+A limit describes the value a function approaches as its input approaches a particular value.
+
+Probability:
+
+Probability measures the likelihood of an event occurring.
+
+Basic probability:
+
+P(A) = Number of favorable outcomes / Total number of outcomes
+
+Vectors:
+
+A vector has both magnitude and direction.
+
+Eigenvalues and Eigenvectors:
+
+For a square matrix A:
+
+A v = lambda v
+
+where lambda is an eigenvalue and v is the corresponding eigenvector.

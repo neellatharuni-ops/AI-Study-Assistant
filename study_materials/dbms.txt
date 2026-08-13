@@ -1,0 +1,35 @@
+DBMS NOTES
+
+Database Management System:
+
+A DBMS is software used to store, organize, retrieve and manage data.
+
+Advantages of DBMS:
+1. Reduces data redundancy.
+2. Improves data security.
+3. Provides data consistency.
+4. Allows multiple users to access data.
+
+Keys in DBMS:
+
+Primary Key:
+A primary key uniquely identifies each record in a table.
+
+Candidate Key:
+A candidate key is an attribute or set of attributes that can uniquely identify a record.
+
+Foreign Key:
+A foreign key connects one table with another table.
+
+Normalization:
+
+Normalization is the process of organizing data in a database to reduce redundancy and improve data integrity.
+
+First Normal Form (1NF):
+A table is in 1NF when each cell contains a single atomic value.
+
+Second Normal Form (2NF):
+A table is in 2NF when it is in 1NF and has no partial dependency.
+
+Third Normal Form (3NF):
+A table is in 3NF when it is in 2NF and has no transitive dependency.

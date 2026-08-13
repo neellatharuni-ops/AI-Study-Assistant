@@ -1,0 +1,74 @@
+PYTHON NOTES
+
+Python:
+
+Python is a high-level, interpreted programming language.
+
+Variables:
+
+Variables are used to store data.
+
+Example:
+
+x = 10
+name = "Student"
+
+Data Types:
+
+Common Python data types include:
+- int
+- float
+- string
+- boolean
+- list
+- tuple
+- dictionary
+- set
+
+Conditional Statements:
+
+if, elif and else are used to make decisions.
+
+Loops:
+
+for and while loops are used to repeat instructions.
+
+Functions:
+
+A function is a reusable block of code.
+
+Example:
+
+def add(a, b):
+    return a + b
+
+Lists:
+
+A list is an ordered and mutable collection.
+
+Example:
+
+numbers = [10, 20, 30]
+
+Dictionaries:
+
+A dictionary stores data as key-value pairs.
+
+Example:
+
+student = {
+    "name": "Student",
+    "score": 80
+}
+
+Object-Oriented Programming:
+
+OOP is a programming approach based on objects and classes.
+
+Important concepts:
+- Class
+- Object
+- Inheritance
+- Encapsulation
+- Polymorphism
+- Abstraction
