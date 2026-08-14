@@ -1,3 +1,4 @@
+
 import os
 from pathlib import Path
 
@@ -39,193 +40,216 @@ def load_documents():
                 documents.append(
                     {
                         "filename": file_path.name,
-                        "content": text
+                        "text": text
                     }
                 )
 
         except Exception as e:
 
             print(
-                f"Could not read {file_path}: {e}"
+                f"Could not read {file_path.name}: {e}"
             )
 
     return documents
 
 
 # ============================================================
-# RETRIEVE RELEVANT CONTENT
+# SPLIT DOCUMENT INTO CHUNKS
 # ============================================================
 
-def retrieve_relevant_content(
-    query,
-    top_k=2
+def create_chunks(
+    text,
+    chunk_size=1000,
+    overlap=200
 ):
+
+    text = text.strip()
+
+    if not text:
+
+        return []
+
+    chunks = []
+
+    start = 0
+
+    while start < len(text):
+
+        end = start + chunk_size
+
+        chunk = text[start:end]
+
+        if chunk.strip():
+
+            chunks.append(
+                chunk.strip()
+            )
+
+        start += chunk_size - overlap
+
+    return chunks
+
+
+# ============================================================
+# BUILD KNOWLEDGE BASE
+# ============================================================
+
+def build_knowledge_base():
 
     documents = load_documents()
 
-    if not documents:
+    knowledge_base = []
 
-        return (
-            "No study materials were found."
+    for document in documents:
+
+        chunks = create_chunks(
+            document["text"]
         )
 
-    texts = [
-        document["content"]
-        for document in documents
+        for chunk in chunks:
+
+            knowledge_base.append(
+                {
+                    "filename": document["filename"],
+                    "text": chunk
+                }
+            )
+
+    return knowledge_base
+
+
+# ============================================================
+# RETRIEVE RELEVANT STUDY MATERIAL
+# ============================================================
+
+def retrieve_context(
+    question,
+    top_k=3
+):
+
+    knowledge_base = build_knowledge_base()
+
+    if not knowledge_base:
+
+        return ""
+
+
+    documents = [
+        item["text"]
+        for item in knowledge_base
     ]
 
-    # Create TF-IDF representation
+
+    # --------------------------------------------------------
+    # TF-IDF VECTOR REPRESENTATION
+    # --------------------------------------------------------
+
     vectorizer = TfidfVectorizer(
         stop_words="english"
     )
 
+
     try:
 
         document_vectors = vectorizer.fit_transform(
-            texts
+            documents
         )
 
-        query_vector = vectorizer.transform(
-            [query]
+        question_vector = vectorizer.transform(
+            [question]
         )
 
     except ValueError:
 
-        return (
-            "Unable to process the study materials."
-        )
+        return ""
 
-    # Calculate similarity
+
+    # --------------------------------------------------------
+    # CALCULATE SIMILARITY
+    # --------------------------------------------------------
+
     similarities = cosine_similarity(
-        query_vector,
+        question_vector,
         document_vectors
     )[0]
 
-    # Get best matching documents
+
+    # --------------------------------------------------------
+    # GET TOP MATCHES
+    # --------------------------------------------------------
+
     ranked_indices = similarities.argsort()[
         ::-1
     ]
 
-    results = []
+
+    selected_chunks = []
+
 
     for index in ranked_indices[:top_k]:
 
-        if similarities[index] <= 0:
+        score = similarities[index]
+
+        if score <= 0:
 
             continue
 
-        results.append(
-            {
-                "filename": documents[index]["filename"],
-                "content": documents[index]["content"],
-                "score": similarities[index]
-            }
+        item = knowledge_base[index]
+
+        selected_chunks.append(
+            f"Source: {item['filename']}\n"
+            f"{item['text']}"
         )
 
-    if not results:
 
-        return (
-            "No relevant content was found "
-            "in your study materials."
-        )
+    # --------------------------------------------------------
+    # RETURN CONTEXT
+    # --------------------------------------------------------
 
-    # Format retrieved content
-    output = []
-
-    for result in results:
-
-        output.append(
-            f"""
-===== {result["filename"]} =====
-
-{result["content"]}
-"""
-        )
-
-    return "\n".join(output)
-
-
-# ============================================================
-# RAG CONTEXT
-# ============================================================
-
-def get_rag_context(
-    query,
-    top_k=2
-):
-
-    documents = load_documents()
-
-    if not documents:
+    if not selected_chunks:
 
         return ""
 
-    texts = [
-        document["content"]
-        for document in documents
-    ]
 
-    vectorizer = TfidfVectorizer(
-        stop_words="english"
+    return "\n\n---\n\n".join(
+        selected_chunks
     )
 
-    try:
-
-        document_vectors = vectorizer.fit_transform(
-            texts
-        )
-
-        query_vector = vectorizer.transform(
-            [query]
-        )
-
-    except ValueError:
-
-        return ""
-
-    similarities = cosine_similarity(
-        query_vector,
-        document_vectors
-    )[0]
-
-    ranked_indices = similarities.argsort()[
-        ::-1
-    ]
-
-    selected = []
-
-    for index in ranked_indices[:top_k]:
-
-        if similarities[index] > 0:
-
-            selected.append(
-                documents[index]["content"]
-            )
-
-    return "\n\n".join(selected)
-
 
 # ============================================================
-# TEST MODE
+# TEST RAG
 # ============================================================
 
 if __name__ == "__main__":
 
     print()
-    print("=" * 50)
-    print("           RAG STUDY SEARCH")
-    print("=" * 50)
+    print("===================================")
+    print("       RAG STUDY MATERIAL TEST")
+    print("===================================")
     print()
 
     question = input(
         "Ask a question about your study material: "
     )
 
-    result = retrieve_relevant_content(
+
+    context = retrieve_context(
         question
     )
+
 
     print()
     print("===== RETRIEVED CONTENT =====")
     print()
-    print(result)
+
+
+    if context:
+
+        print(context)
+
+    else:
+
+        print(
+            "No relevant study material found."
+        )
+
