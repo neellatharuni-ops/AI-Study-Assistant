@@ -84,19 +84,46 @@ def get_snowflake_connection():
 # ============================================================
 # GET STUDENT PROGRESS FROM SNOWFLAKE
 # ============================================================
-
 def get_student_progress():
 
     conn = None
     cursor = None
 
     try:
-
         conn = get_snowflake_connection()
-
         cursor = conn.cursor()
 
-        # Explicit database + schema + table
+        # Check current Snowflake context
+        cursor.execute("""
+            SELECT CURRENT_ACCOUNT(),
+                   CURRENT_USER(),
+                   CURRENT_ROLE(),
+                   CURRENT_DATABASE(),
+                   CURRENT_SCHEMA(),
+                   CURRENT_WAREHOUSE()
+        """)
+
+        context = cursor.fetchone()
+
+        print("===== SNOWFLAKE CONTEXT =====")
+        print("Account:", context[0])
+        print("User:", context[1])
+        print("Role:", context[2])
+        print("Database:", context[3])
+        print("Schema:", context[4])
+        print("Warehouse:", context[5])
+
+        # Check table
+        cursor.execute("""
+            SELECT COUNT(*)
+            FROM AI_STUDY_DB.PUBLIC.STUDENT_PROGRESS
+        """)
+
+        count = cursor.fetchone()[0]
+
+        print("STUDENT_PROGRESS rows:", count)
+
+        # Get student data
         cursor.execute("""
             SELECT SUBJECT, SCORE
             FROM AI_STUDY_DB.PUBLIC.STUDENT_PROGRESS
@@ -106,11 +133,15 @@ def get_student_progress():
 
         rows = cursor.fetchall()
 
+        print("Student rows:", rows)
+
         return rows
 
     except Exception as e:
 
-        print("Snowflake error:", e)
+        print("===== SNOWFLAKE ERROR =====")
+        print(type(e).__name__)
+        print(str(e))
 
         return []
 
@@ -121,8 +152,6 @@ def get_student_progress():
 
         if conn:
             conn.close()
-
-
 # ============================================================
 # GET STUDENT DATA AS DICTIONARY
 # ============================================================
