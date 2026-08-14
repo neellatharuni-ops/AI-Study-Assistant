@@ -4,3 +4,4 @@ groq
 python-dotenv
 scikit-learn
 numpy
+pyarrow<24,>=14.0.1
