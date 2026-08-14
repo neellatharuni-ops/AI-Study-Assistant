@@ -1,0 +1,6 @@
+streamlit
+snowflake-connector-python
+groq
+python-dotenv
+scikit-learn
+numpy
