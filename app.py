@@ -32,9 +32,9 @@ st.subheader(
 
 st.write(
     """
-This application analyzes your academic performance,
-identifies subjects that need attention, and uses AI
-to provide personalized study recommendations.
+Analyze your academic performance, identify the subjects
+that need more attention, and get personalized AI-powered
+study recommendations.
 """
 )
 
@@ -42,7 +42,7 @@ st.divider()
 
 
 # ============================================================
-# GET STUDENT PROGRESS FROM SNOWFLAKE
+# LOAD STUDENT DATA
 # ============================================================
 
 try:
@@ -51,7 +51,9 @@ try:
 
 except Exception as e:
 
-    st.error("Unable to retrieve student data from Snowflake.")
+    st.error(
+        "Unable to retrieve student data from Snowflake."
+    )
 
     st.exception(e)
 
@@ -59,17 +61,7 @@ except Exception as e:
 
 
 # ============================================================
-# TEMPORARY DEBUG INFORMATION
-# ============================================================
-
-st.write(
-    "DEBUG: Snowflake rows returned:",
-    rows
-)
-
-
-# ============================================================
-# CHECK WHETHER DATA EXISTS
+# CHECK DATA
 # ============================================================
 
 if not rows:
@@ -79,49 +71,45 @@ if not rows:
     )
 
     st.info(
-        "Please check the STUDENT_PROGRESS table and "
-        "your Streamlit Cloud Snowflake secrets."
+        "Please check the STUDENT_PROGRESS table."
     )
 
     st.stop()
 
 
 # ============================================================
-# PROCESS VALID SCORES
+# PROCESS STUDENT DATA
 # ============================================================
 
-valid_rows = []
+student_scores = {}
 
 for row in rows:
 
-    if len(row) >= 2:
+    if len(row) < 2:
+        continue
 
-        subject = row[0]
-        score = row[1]
+    subject = row[0]
+    score = row[1]
 
-        if subject is not None and score is not None:
+    if subject is None or score is None:
+        continue
 
-            try:
+    try:
 
-                score = float(score)
+        score = float(score)
 
-                valid_rows.append(
-                    (
-                        str(subject),
-                        score
-                    )
-                )
+        student_scores[str(subject)] = score
 
-            except (ValueError, TypeError):
+    except (ValueError, TypeError):
 
-                continue
+        continue
 
 
 # ============================================================
-# CHECK VALID SCORES
+# VALIDATE SCORES
 # ============================================================
 
-if not valid_rows:
+if not student_scores:
 
     st.error(
         "Student records were found, but no valid scores are available."
@@ -131,18 +119,7 @@ if not valid_rows:
 
 
 # ============================================================
-# CREATE SCORE DICTIONARY
-# ============================================================
-
-student_scores = {}
-
-for subject, score in valid_rows:
-
-    student_scores[subject] = score
-
-
-# ============================================================
-# CALCULATE AVERAGE
+# CALCULATE PERFORMANCE
 # ============================================================
 
 scores = list(
@@ -153,10 +130,6 @@ average_score = (
     sum(scores) / len(scores)
 )
 
-
-# ============================================================
-# STRONGEST AND WEAKEST SUBJECT
-# ============================================================
 
 strongest_subject = max(
     student_scores,
@@ -184,7 +157,6 @@ weakest_score = student_scores[
 
 st.header("📊 Your Performance")
 
-
 col1, col2, col3 = st.columns(3)
 
 
@@ -192,7 +164,7 @@ with col1:
 
     st.metric(
         "Average Score",
-        f"{average_score:.1f}"
+        f"{average_score:.1f}/100"
     )
 
 
@@ -201,7 +173,7 @@ with col2:
     st.metric(
         "Strongest Subject",
         strongest_subject,
-        f"{strongest_score:.0f}"
+        f"{strongest_score:.0f}/100"
     )
 
 
@@ -210,7 +182,7 @@ with col3:
     st.metric(
         "Needs Most Attention",
         weakest_subject,
-        f"{weakest_score:.0f}"
+        f"{weakest_score:.0f}/100"
     )
 
 
@@ -226,86 +198,80 @@ st.header("📚 Subject Performance")
 
 for subject, score in student_scores.items():
 
-    col1, col2 = st.columns(
-        [2, 5]
+    st.write(
+        f"**{subject} — {score:.0f}/100**"
     )
 
-    with col1:
-
-        st.write(
-            f"**{subject}**"
+    st.progress(
+        min(
+            max(
+                int(score),
+                0
+            ),
+            100
         )
-
-    with col2:
-
-        st.progress(
-            min(
-                max(
-                    int(score),
-                    0
-                ),
-                100
-            )
-        )
-
-        st.caption(
-            f"Score: {score:.0f}/100"
-        )
+    )
 
 
 st.divider()
 
 
 # ============================================================
-# AI STUDY RECOMMENDATION
+# AUTOMATIC AI STUDY RECOMMENDATION
 # ============================================================
 
 st.header("🤖 AI Study Recommendation")
 
 
 if st.button(
-    "Generate My Study Recommendation",
+    "Generate My Study Plan",
     type="primary"
 ):
 
     with st.spinner(
-        "Analyzing your performance..."
+        "AI is analyzing your performance..."
     ):
+
+        recommendation_prompt = f"""
+You are an AI academic study assistant.
+
+Analyze the student's performance below.
+
+Scores:
+{student_scores}
+
+Average score:
+{average_score:.1f}
+
+Strongest subject:
+{strongest_subject} ({strongest_score:.0f}/100)
+
+Weakest subject:
+{weakest_subject} ({weakest_score:.0f}/100)
+
+Provide a practical study recommendation.
+
+Your response must include:
+
+1. Which subject the student should study first.
+2. Why that subject should be the first priority.
+3. A recommended study duration.
+4. Which topic should be studied next.
+5. A simple 3-step daily study plan.
+6. How the student can improve the weakest subject.
+7. One motivating sentence.
+
+Keep the answer simple and suitable for a college student.
+"""
 
         try:
 
-            question = f"""
-Analyze my academic performance.
-
-My scores are:
-
-{student_scores}
-
-My average score is {average_score:.1f}.
-
-My strongest subject is
-{strongest_subject} with a score of
-{strongest_score:.0f}.
-
-My weakest subject is
-{weakest_subject} with a score of
-{weakest_score:.0f}.
-
-Tell me:
-
-1. Which subject should I study first?
-2. Why should I study it first?
-3. How much time should I spend on it?
-4. What should I study next?
-5. Give me a simple daily study plan.
-"""
-
             response = study_agent(
-                question
+                recommendation_prompt
             )
 
             st.success(
-                "Recommendation generated!"
+                "Personalized study plan generated!"
             )
 
             st.markdown(
@@ -315,7 +281,7 @@ Tell me:
         except Exception as e:
 
             st.error(
-                "Unable to generate AI recommendation."
+                "Unable to generate the study recommendation."
             )
 
             st.exception(e)
@@ -325,15 +291,14 @@ st.divider()
 
 
 # ============================================================
-# ASK AI
+# ASK AI STUDY ASSISTANT
 # ============================================================
 
 st.header("💬 Ask Your AI Study Assistant")
 
-
 question = st.text_input(
     "Ask a question about your studies:",
-    placeholder="Example: Which subject should I study first?"
+    placeholder="Example: What is normalization?"
 )
 
 
@@ -350,7 +315,7 @@ if st.button(
     else:
 
         with st.spinner(
-            "Thinking..."
+            "Searching your study material..."
         ):
 
             try:
@@ -359,25 +324,70 @@ if st.button(
                 # RETRIEVE RELEVANT STUDY MATERIAL
                 # ------------------------------------------------
 
-                try:
-
-                    context = retrieve_context(
-                        question
-                    )
-
-                except Exception:
-
-                    context = ""
+                context = retrieve_context(
+                    question
+                )
 
 
                 # ------------------------------------------------
-                # GENERATE AI RESPONSE
+                # CREATE PROMPT
+                # ------------------------------------------------
+
+                if context:
+
+                    prompt = f"""
+You are an AI Study Assistant.
+
+Answer the student's question using the
+provided study material whenever possible.
+
+STUDY MATERIAL:
+{context}
+
+STUDENT QUESTION:
+{question}
+
+STUDENT PERFORMANCE:
+{student_scores}
+
+Instructions:
+
+- Give a clear and simple explanation.
+- Use the study material as the primary source.
+- If the material contains the answer, stay consistent with it.
+- Give an example when useful.
+- If the question is related to a weak subject,
+  encourage the student to practice that topic.
+"""
+
+                else:
+
+                    prompt = f"""
+You are an AI Study Assistant.
+
+Answer the following student question clearly.
+
+STUDENT QUESTION:
+{question}
+
+STUDENT PERFORMANCE:
+{student_scores}
+
+The student's weakest subject is:
+{weakest_subject}
+
+Give a simple educational explanation.
+"""
+
+
+                # ------------------------------------------------
+                # AI RESPONSE
                 # ------------------------------------------------
 
                 response = study_agent(
-                    question,
-                    context
+                    prompt
                 )
+
 
                 st.subheader(
                     "🤖 AI Response"
@@ -387,32 +397,49 @@ if st.button(
                     response
                 )
 
+
             except Exception as e:
 
                 st.error(
-                    "Unable to generate response."
+                    "Unable to generate an AI response."
                 )
 
                 st.exception(e)
 
 
-# ============================================================
-# STUDENT DATA TABLE
-# ============================================================
-
 st.divider()
 
-st.header("📋 Student Performance Data")
+
+# ============================================================
+# STUDENT PERFORMANCE TABLE
+# ============================================================
+
+st.header("📋 Performance Summary")
 
 
 display_data = []
 
+
 for subject, score in student_scores.items():
+
+    if score >= 75:
+
+        status = "🟢 Strong"
+
+    elif score >= 60:
+
+        status = "🟡 Average"
+
+    else:
+
+        status = "🔴 Needs Improvement"
+
 
     display_data.append(
         {
             "Subject": subject,
-            "Score": score
+            "Score": f"{score:.0f}/100",
+            "Status": status
         }
     )
 
@@ -424,6 +451,52 @@ st.dataframe(
 )
 
 
+st.divider()
+
+
+# ============================================================
+# STUDY PRIORITY
+# ============================================================
+
+st.header("🎯 Study Priority")
+
+
+if weakest_score < 50:
+
+    priority_message = (
+        f"🔴 **High Priority:** Focus on "
+        f"**{weakest_subject}** first. "
+        f"Your current score is {weakest_score:.0f}/100."
+    )
+
+elif weakest_score < 60:
+
+    priority_message = (
+        f"🟠 **Medium-High Priority:** Give extra "
+        f"attention to **{weakest_subject}**. "
+        f"Your current score is {weakest_score:.0f}/100."
+    )
+
+elif weakest_score < 75:
+
+    priority_message = (
+        f"🟡 **Medium Priority:** Practice "
+        f"**{weakest_subject}** regularly to improve."
+    )
+
+else:
+
+    priority_message = (
+        "🟢 **Good Performance:** You are performing "
+        "well across your subjects. Keep practicing!"
+    )
+
+
+st.info(
+    priority_message
+)
+
+
 # ============================================================
 # FOOTER
 # ============================================================
@@ -432,5 +505,5 @@ st.divider()
 
 st.caption(
     "📚 AI Study Assistant | "
-    "Powered by Snowflake, Groq AI, RAG and Streamlit"
+    "Powered by Snowflake • Groq AI • RAG • Streamlit"
 )
