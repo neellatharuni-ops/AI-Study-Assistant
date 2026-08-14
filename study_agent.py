@@ -1,15 +1,27 @@
-import os
 
+import os
+import streamlit as st
 import snowflake.connector
 from dotenv import load_dotenv
 from groq import Groq
 
-
-# ============================================================
-# LOAD ENVIRONMENT VARIABLES
-# ============================================================
-
+# Load local .env file
 load_dotenv()
+
+
+# ============================================================
+# GET CONFIGURATION
+# Works both locally (.env) and on Streamlit Cloud (Secrets)
+# ============================================================
+
+def get_secret(name):
+    try:
+        if name in st.secrets:
+            return st.secrets[name]
+    except Exception:
+        pass
+
+    return os.getenv(name)
 
 
 # ============================================================
@@ -17,95 +29,84 @@ load_dotenv()
 # ============================================================
 
 def get_snowflake_connection():
+    account = get_secret("SNOWFLAKE_ACCOUNT")
+    user = get_secret("SNOWFLAKE_USER")
+    password = get_secret("SNOWFLAKE_PASSWORD")
+    warehouse = get_secret("SNOWFLAKE_WAREHOUSE")
+    database = get_secret("SNOWFLAKE_DATABASE")
+    schema = get_secret("SNOWFLAKE_SCHEMA")
+
+    missing = []
+
+    if not account:
+        missing.append("SNOWFLAKE_ACCOUNT")
+
+    if not user:
+        missing.append("SNOWFLAKE_USER")
+
+    if not password:
+        missing.append("SNOWFLAKE_PASSWORD")
+
+    if not warehouse:
+        missing.append("SNOWFLAKE_WAREHOUSE")
+
+    if not database:
+        missing.append("SNOWFLAKE_DATABASE")
+
+    if not schema:
+        missing.append("SNOWFLAKE_SCHEMA")
+
+    if missing:
+        raise ValueError(
+            "Missing Snowflake configuration: "
+            + ", ".join(missing)
+        )
 
     conn = snowflake.connector.connect(
-        account=os.getenv("SNOWFLAKE_ACCOUNT"),
-        user=os.getenv("SNOWFLAKE_USER"),
-        password=os.getenv("SNOWFLAKE_PASSWORD"),
-        warehouse=os.getenv("SNOWFLAKE_WAREHOUSE"),
-        database=os.getenv("SNOWFLAKE_DATABASE"),
-        schema=os.getenv("SNOWFLAKE_SCHEMA")
+        account=account,
+        user=user,
+        password=password,
+        warehouse=warehouse,
+        database=database,
+        schema=schema
     )
 
     return conn
 
 
 # ============================================================
-# GET STUDENT PERFORMANCE
+# GET STUDENT PROGRESS
 # ============================================================
 
 def get_student_progress():
-
-    conn = get_snowflake_connection()
-    cursor = conn.cursor()
+    conn = None
+    cursor = None
 
     try:
+        conn = get_snowflake_connection()
+
+        cursor = conn.cursor()
 
         cursor.execute("""
             SELECT SUBJECT, SCORE
             FROM STUDENT_PROGRESS
-            WHERE SCORE IS NOT NULL
-            ORDER BY SCORE DESC
+            ORDER BY SUBJECT
         """)
 
         rows = cursor.fetchall()
 
         return rows
 
+    except Exception as e:
+        print("Snowflake error:", e)
+        return []
+
     finally:
+        if cursor:
+            cursor.close()
 
-        cursor.close()
-        conn.close()
-
-
-# ============================================================
-# ANALYZE PERFORMANCE
-# ============================================================
-
-def analyze_performance(rows):
-
-    if not rows:
-        return None
-
-    valid_rows = [
-        row for row in rows
-        if len(row) >= 2 and row[1] is not None
-    ]
-
-    if not valid_rows:
-        return None
-
-    # Convert scores to float
-    cleaned_rows = [
-        (str(row[0]), float(row[1]))
-        for row in valid_rows
-    ]
-
-    # Average score
-    scores = [
-        score for subject, score in cleaned_rows
-    ]
-
-    average_score = sum(scores) / len(scores)
-
-    # Highest score
-    strongest_subject = max(
-        cleaned_rows,
-        key=lambda x: x[1]
-    )
-
-    # Lowest score
-    weakest_subject = min(
-        cleaned_rows,
-        key=lambda x: x[1]
-    )
-
-    return {
-        "rows": cleaned_rows,
-        "average": average_score,
-        "strongest": strongest_subject,
-        "weakest": weakest_subject
-    }
+        if conn:
+            conn.close()
 
 
 # ============================================================
@@ -113,303 +114,147 @@ def analyze_performance(rows):
 # ============================================================
 
 def get_groq_client():
-
-    api_key = os.getenv("GROQ_API_KEY")
+    api_key = get_secret("GROQ_API_KEY")
 
     if not api_key:
-
-        raise ValueError(
-            "GROQ_API_KEY is missing from the .env file."
-        )
+        raise ValueError("GROQ_API_KEY is missing.")
 
     return Groq(api_key=api_key)
 
 
 # ============================================================
-# AI STUDY AGENT
+# GET STUDENT DATA
 # ============================================================
 
-def study_agent(prompt):
+def get_student_data():
+    rows = get_student_progress()
 
+    student_data = {}
+
+    for row in rows:
+        subject = row[0]
+        score = row[1]
+
+        if subject is not None and score is not None:
+            student_data[subject] = float(score)
+
+    return student_data
+
+
+# ============================================================
+# GENERATE AI RESPONSE
+# ============================================================
+
+def generate_ai_response(question, student_data, retrieved_context=""):
     client = get_groq_client()
 
+    if not student_data:
+        performance_text = "No student performance data is available."
+    else:
+        performance_text = "\n".join(
+            f"{subject}: {score}"
+            for subject, score in student_data.items()
+        )
+
+    prompt = f"""
+You are an AI Study Assistant for a first-year CSE student.
+
+Student performance:
+{performance_text}
+
+Relevant study material:
+{retrieved_context}
+
+Student question:
+{question}
+
+Instructions:
+
+1. Answer the student's question clearly and simply.
+2. If the question is about a study topic, use the relevant study material.
+3. Consider the student's performance when giving recommendations.
+4. Identify weak subjects correctly.
+5. Do not invent student scores.
+6. If the student asks which subject to study first, recommend the
+   subject with the LOWEST valid score.
+7. Give practical and beginner-friendly advice.
+8. Use simple language suitable for a first-year CSE student.
+"""
+
     response = client.chat.completions.create(
-
         model="llama-3.3-70b-versatile",
-
         messages=[
             {
                 "role": "system",
-                "content": """
-You are an AI Study Assistant for a first-year
-Computer Science Engineering student.
-
-Your job is to:
-
-1. Analyze student performance.
-2. Explain concepts simply.
-3. Create personalized study plans.
-4. Recommend practice strategies.
-5. Give motivational guidance.
-
-IMPORTANT:
-When a weakest subject is explicitly provided,
-you MUST respect that calculation.
-Do not replace it with another subject.
-
-Keep answers simple, clear and beginner-friendly.
-"""
+                "content": "You are a helpful AI Study Assistant."
             },
             {
                 "role": "user",
                 "content": prompt
             }
         ],
-
-        temperature=0.2
+        temperature=0.3
     )
 
     return response.choices[0].message.content
 
 
 # ============================================================
-# GENERATE PERSONALIZED RECOMMENDATION
+# MAIN STUDY AGENT
 # ============================================================
 
-def generate_recommendation(rows):
+def study_agent(question, retrieved_context=""):
+    student_data = get_student_data()
 
-    analysis = analyze_performance(rows)
-
-    if analysis is None:
-
-        return (
-            "No valid student performance data "
-            "is available."
-        )
-
-    cleaned_rows = analysis["rows"]
-    average = analysis["average"]
-    strongest = analysis["strongest"]
-    weakest = analysis["weakest"]
-
-    # --------------------------------------------------------
-    # IMPORTANT:
-    # Python determines the priority subject.
-    # AI does NOT decide this.
-    # --------------------------------------------------------
-
-    priority_subject = weakest[0]
-    priority_score = weakest[1]
-
-    prompt = f"""
-You are helping a first-year CSE student.
-
-Here is the student's performance:
-
-{cleaned_rows}
-
-Average score:
-{average:.1f}
-
-Strongest subject:
-{strongest[0]} - {strongest[1]:.0f}
-
-Weakest subject:
-{weakest[0]} - {weakest[1]:.0f}
-
-IMPORTANT INSTRUCTION:
-
-The student's FIRST study priority has already been
-calculated by the application.
-
-FIRST PRIORITY SUBJECT:
-{priority_subject}
-
-FIRST PRIORITY SCORE:
-{priority_score:.0f}
-
-You MUST recommend {priority_subject} as the FIRST
-subject to study.
-
-Do NOT choose another subject as the first priority.
-
-Now provide:
-
-1. First subject to study.
-2. Why it needs the most attention.
-3. A simple daily study plan.
-4. Important topics to study.
-5. Practice recommendations.
-6. How to improve the score.
-7. A short motivational message.
-
-Keep the explanation simple and suitable for
-a first-year Computer Science Engineering student.
-"""
-
-    return study_agent(prompt)
+    return generate_ai_response(
+        question,
+        student_data,
+        retrieved_context
+    )
 
 
 # ============================================================
-# ASK AI A QUESTION
-# ============================================================
-
-def ask_ai(question, rows=None):
-
-    analysis = analyze_performance(rows)
-
-    if analysis:
-
-        performance_text = "\n".join(
-            [
-                f"{subject}: {score:.0f}"
-                for subject, score
-                in analysis["rows"]
-            ]
-        )
-
-        average = analysis["average"]
-
-        strongest = analysis["strongest"]
-
-        weakest = analysis["weakest"]
-
-        priority_subject = weakest[0]
-
-        context = f"""
-Student Performance:
-
-{performance_text}
-
-Average Score:
-{average:.1f}
-
-Strongest Subject:
-{strongest[0]} - {strongest[1]:.0f}
-
-Weakest Subject:
-{weakest[0]} - {weakest[1]:.0f}
-
-Calculated First Priority:
-{priority_subject}
-"""
-
-    else:
-
-        context = """
-No student performance data is available.
-"""
-
-    prompt = f"""
-You are an AI Study Assistant.
-
-{context}
-
-Student question:
-
-{question}
-
-IMPORTANT:
-
-If the student asks:
-
-"Which subject should I study first?"
-
-The answer MUST be:
-
-{priority_subject if analysis else "Use the available performance data."}
-
-Do not select another subject.
-
-For other questions, answer clearly and simply.
-
-Consider the student's performance when
-giving study advice.
-"""
-
-    return study_agent(prompt)
-
-
-# ============================================================
-# TEST MODE
+# COMMAND-LINE MODE
 # ============================================================
 
 if __name__ == "__main__":
 
     print()
-    print("=" * 50)
-    print("          AI STUDY ASSISTANT")
-    print("=" * 50)
+    print("===================================")
+    print("       AI STUDY ASSISTANT")
+    print("===================================")
     print()
 
     try:
+        student_data = get_student_data()
 
-        # Get data from Snowflake
-        rows = get_student_progress()
+        if student_data:
 
-        # Display scores
-        print("===== STUDENT PERFORMANCE =====")
-        print()
+            print("===== STUDENT DATA =====")
 
-        for subject, score in rows:
+            for subject, score in student_data.items():
+                print(f"{subject} : {score:g}")
 
-            print(
-                f"{subject}: {score}"
-            )
+            print()
 
-        print()
+        else:
+            print("No student performance data found.")
+            print()
 
-        # Analyze performance
-        analysis = analyze_performance(rows)
+        question = input("Ask your question: ")
 
-        if analysis:
-
-            print(
-                f"Average Score: "
-                f"{analysis['average']:.1f}"
-            )
-
-            print(
-                f"Strongest Subject: "
-                f"{analysis['strongest'][0]} "
-                f"({analysis['strongest'][1]:.0f})"
-            )
-
-            print(
-                f"Weakest Subject: "
-                f"{analysis['weakest'][0]} "
-                f"({analysis['weakest'][1]:.0f})"
-            )
-
-            print(
-                f"Study First: "
-                f"{analysis['weakest'][0]}"
-            )
-
-        print()
-        print("=" * 50)
-
-        # Ask user
-        question = input(
-            "Ask your question: "
-        )
-
-        # Generate AI answer
-        answer = ask_ai(
-            question,
-            rows
-        )
+        answer = study_agent(question)
 
         print()
         print("========== AI RESPONSE ==========")
         print()
         print(answer)
-
         print()
-        print("=" * 50)
+        print("==================================")
 
     except Exception as e:
 
         print()
         print("ERROR:")
         print(e)
+        print()
