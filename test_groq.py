@@ -13,7 +13,7 @@ if not api_key:
 client = Groq(api_key=api_key)
 
 response = client.chat.completions.create(
-model="openai/gpt-oss-120b",
+model="openai/gpt-oss-20b",
     messages=[
         {
             "role": "user",
