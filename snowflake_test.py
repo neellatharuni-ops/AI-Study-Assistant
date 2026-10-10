@@ -90,7 +90,7 @@ Keep the explanation simple and easy for a college student to understand.
 """
 
 response = client.chat.completions.create(
-    model="llama-3.3-70b-versatile",
+    model="openai/gpt-oss-120b",
     messages=[
         {
             "role": "user",

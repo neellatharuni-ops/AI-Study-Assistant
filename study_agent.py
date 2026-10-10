@@ -1,10 +1,10 @@
-
 import os
 
 import streamlit as st
 import snowflake.connector
 from dotenv import load_dotenv
 from groq import Groq
+
 
 # ============================================================
 # LOAD LOCAL ENVIRONMENT VARIABLES
@@ -84,6 +84,7 @@ def get_snowflake_connection():
 # ============================================================
 # GET STUDENT PROGRESS FROM SNOWFLAKE
 # ============================================================
+
 def get_student_progress():
 
     conn = None
@@ -152,6 +153,8 @@ def get_student_progress():
 
         if conn:
             conn.close()
+
+
 # ============================================================
 # GET STUDENT DATA AS DICTIONARY
 # ============================================================
@@ -303,11 +306,8 @@ Follow these rules carefully:
     # --------------------------------------------------------
 
     response = client.chat.completions.create(
-
-        model="llama-3.3-70b-versatile",
-
+        model="openai/gpt-oss-120b",
         messages=[
-
             {
                 "role": "system",
                 "content": (
@@ -315,14 +315,11 @@ Follow these rules carefully:
                     "student-friendly AI Study Assistant."
                 )
             },
-
             {
                 "role": "user",
                 "content": prompt
             }
-
         ],
-
         temperature=0.2
     )
 
@@ -439,4 +436,3 @@ if __name__ == "__main__":
         print("ERROR:")
         print(e)
         print()
-
